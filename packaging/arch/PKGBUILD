@@ -1,7 +1,7 @@
 # Maintainer: openOODA-tools <ops@openooda.org>
 pkgname=oobinary-bin
 _pkgname=oobinary
-pkgver=0.1.0
+pkgver=0.2.0
 pkgrel=1
 pkgdesc="Bit-level endianness converter, bitmask applicator, and stream aligner."
 arch=('x86_64')

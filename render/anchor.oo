@@ -1,0 +1,20 @@
+// # oobinary Render Subsystem Anchor
+//
+// Logline: Consolidates and re-exports presentation formatters for oobinary.
+//
+// Setup: Exports ANSI terminal themes, bit visualizers, and JSON serializers.
+//
+// Beats:
+//   1. Re-export bit-level inspection terminal visualizer.
+//   2. Re-export structured bit string JSON serializers.
+//   3. Re-export operation statistics telemetry formatters.
+
+import "render/binary_theme.oo";
+
+pub fn render_subsystem_version() -> String {
+    return "0.2.0";
+}
+
+pub fn render_subsystem_description() -> String {
+    return "oobinary pure openOODA render and theme subsystem";
+}

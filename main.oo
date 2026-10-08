@@ -1,52 +1,148 @@
-// # oobinary Main Entry Point
+// # oobinary Main Entry Point - Sovereign Bit Packer
 //
-// Logline: Bit-level endianness converter, bitmask applicator, and stream aligner.
+// Logline: Ingests data streams, performing endianness swaps, bitmasks, and alignment.
 //
 // Setup: Demands explicit capability tokens and standard argument list.
 //
 // Beats:
 //   1. Parse command-line options and dispatch --help, --version, or --mcp.
-//   2. Execute capability-bounded oobinary operations.
-//   3. Format and output structured results to standard output.
+//   2. Ingest payload from referenced file, inline argument, or standard input.
+//   3. Dispatch bitwise transforms, stream alignment, or canonical bit visualizer.
+
+import "core/endian_swap.oo";
+import "core/bit_mask.oo";
+import "render/binary_theme.oo";
+import "ipc/binary_opts.oo";
+import "ipc/mcp_serve.oo";
 
 fn render_help() -> String {
-    return "oobinary 0.1.0 (openOODA sovereign data & streaming)\n"
-        + "usage: oobinary [options] [ARGUMENTS]...\n\n"
-        + "Bit-level endianness converter, bitmask applicator, and stream aligner.\n\n"
+    return "oobinary 0.2.0 (openOODA sovereign bit packing & alignment)\n"
+        + "usage: oobinary [options] [INPUT_OR_FILE]\n\n"
+        + "Capability-bounded endianness converter, bitmask applicator, and stream aligner.\n\n"
         + "Options:\n"
-        + "  -h, --help           display this help and exit\n"
-        + "  -v, --version        output version information and exit\n"
-        + "      --json           output formatted as JSON Lines\n"
-        + "      --color <WHEN>   colorize output: auto, always, never [default: auto]\n"
-        + "      --theme <NAME>   override active oote palette\n"
-        + "      --mcp            run as Model Context Protocol stdio server\n";
+        + "  -h, --help               display this help and exit\n"
+        + "  -v, --version            output version information and exit\n"
+        + "  -b, --bits               display 8-bit binary representation (default)\n"
+        + "      --swap16             invert 16-bit word byte pairs\n"
+        + "      --swap32             invert 32-bit word byte order\n"
+        + "      --swap64             invert 64-bit word byte order\n"
+        + "  -e, --endian <16|32|64>  invert word byte order for specified width\n"
+        + "  -m, --mask <VAL>         apply bitwise mask value (0-255)\n"
+        + "      --op <and|or|xor|not> bitwise mask operator [default: xor]\n"
+        + "  -a, --align <N>          pad byte stream to N-byte boundary [default: 1]\n"
+        + "  -p, --pad <BYTE>         fill byte value for alignment padding [default: 0]\n"
+        + "  -r, --reverse            reverse bit order within each byte\n"
+        + "  -n, --length <N>         maximum bytes to inspect in bit view [default: 32]\n"
+        + "  -f, --file <PATH>        read payload from file\n"
+        + "      --json               output telemetry as formatted JSON\n"
+        + "      --mcp                run as Model Context Protocol stdio server\n";
 }
 
-fn render_version() -> String {
-    return "oobinary 0.1.0 (openOODA sovereign data & streaming)\n";
-}
+pub fn main(
+    fs: &FsReadCap,
+    proc_cap: &ProcessCap,
+    env: &EnvCap,
+    args: List[String]
+) -> Result[Int, String] {
+    let opts: BinaryOpts = parse_binary_args(args);
 
-fn main(args: List[String]) -> Int {
-    let num_args: Int = list_len(args);
-    let mut i: Int = 0;
-
-    while i < num_args {
-        let arg: String = list_get(args, i);
-        if arg == "-h" || arg == "--help" {
-            print(render_help());
-            return 0;
-        }
-        if arg == "-v" || arg == "--version" {
-            print(render_version());
-            return 0;
-        }
-        if arg == "--mcp" {
-            print("{\"jsonrpc\":\"2.0\",\"result\":{\"status\":\"ready\",\"tool\":\"oobinary\"}}\n");
-            return 0;
-        }
-        i = i + 1;
+    if opts.action == "help" {
+        print(render_help());
+        return Ok(0);
     }
 
-    print("oobinary: sovereign capability-bounded utility ready\n");
-    return 0;
+    if opts.action == "version" {
+        println("oobinary 0.2.0 (openOODA sovereign bit packing & alignment)");
+        return Ok(0);
+    }
+
+    if opts.action == "mcp" {
+        run_mcp_server(fs);
+        return Ok(0);
+    }
+
+    let mut payload: String = opts.input_text;
+    if chars_len(opts.file_path) > 0 {
+        let f_res: Result[String, String] = read_file(fs, opts.file_path);
+        if !f_res.is_ok() {
+            println("oobinary: cannot open '" + opts.file_path + "': No such file or read error");
+            return Ok(1);
+        }
+        payload = match f_res { Ok(s) => s, Err(_) => "" };
+    }
+
+    if chars_len(payload) == 0 {
+        println("oobinary: missing input operand\nTry 'oobinary --help' for more information.");
+        return Ok(1);
+    }
+
+    let orig_len: Int = chars_len(payload);
+
+    if opts.operation == "swap16" {
+        let res: String = swap_endian_16(payload);
+        if opts.json_mode {
+            println(render_binary_stats_json(orig_len, chars_len(res), "swap16"));
+        } else {
+            print(res);
+        }
+        return Ok(0);
+    }
+
+    if opts.operation == "swap32" {
+        let res: String = swap_endian_32(payload);
+        if opts.json_mode {
+            println(render_binary_stats_json(orig_len, chars_len(res), "swap32"));
+        } else {
+            print(res);
+        }
+        return Ok(0);
+    }
+
+    if opts.operation == "swap64" {
+        let res: String = swap_endian_64(payload);
+        if opts.json_mode {
+            println(render_binary_stats_json(orig_len, chars_len(res), "swap64"));
+        } else {
+            print(res);
+        }
+        return Ok(0);
+    }
+
+    if opts.operation == "mask" {
+        let res: String = apply_mask_op(payload, opts.mask_val, opts.mask_op);
+        if opts.json_mode {
+            println(render_binary_stats_json(orig_len, chars_len(res), "mask_" + opts.mask_op));
+        } else {
+            print(res);
+        }
+        return Ok(0);
+    }
+
+    if opts.operation == "align" {
+        let res: String = align_stream(payload, opts.alignment, opts.pad_byte);
+        if opts.json_mode {
+            println(render_binary_stats_json(orig_len, chars_len(res), "align_" + to_string(opts.alignment)));
+        } else {
+            print(res);
+        }
+        return Ok(0);
+    }
+
+    if opts.operation == "reverse" {
+        let res: String = reverse_bits_stream(payload);
+        if opts.json_mode {
+            println(render_binary_stats_json(orig_len, chars_len(res), "reverse_bits"));
+        } else {
+            print(res);
+        }
+        return Ok(0);
+    }
+
+    if opts.json_mode {
+        println(render_bits_json(payload, opts.bits_limit));
+        return Ok(0);
+    }
+
+    print(render_bit_view(payload, opts.bits_limit));
+    return Ok(0);
 }

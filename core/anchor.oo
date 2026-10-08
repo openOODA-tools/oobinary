@@ -1,0 +1,22 @@
+// # oobinary Core Anchor
+//
+// Logline: Consolidates and re-exports core bit manipulation and alignment engines.
+//
+// Setup: Exports bit math, endian swapping, bitmasking, and stream alignment utilities.
+//
+// Beats:
+//   1. Re-export bit-level formatting, reversal, and rotation primitives.
+//   2. Re-export 16-bit, 32-bit, and 64-bit endianness swapping routines.
+//   3. Re-export bitwise masking and power-of-two stream alignment operations.
+
+import "core/bit_math.oo";
+import "core/endian_swap.oo";
+import "core/bit_mask.oo";
+
+pub fn core_subsystem_version() -> String {
+    return "0.2.0";
+}
+
+pub fn core_subsystem_description() -> String {
+    return "oobinary pure openOODA core bit packing and stream alignment subsystem";
+}

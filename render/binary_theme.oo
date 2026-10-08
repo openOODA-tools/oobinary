@@ -1,0 +1,86 @@
+// # oobinary Render Theme & Serializer
+//
+// Logline: Formats bit-level streams and transforms into ANSI terminal views and JSON envelopes.
+//
+// Setup: Visualizes bit strings, hex pairs, and structured metadata for CLI and MCP.
+//
+// Beats:
+//   1. Define ANSI terminal styling escape codes using native byte sequences.
+//   2. Render formatted human-readable bit views displaying byte offsets and binary strings.
+//   3. Serialize transformed binary payloads and metadata into valid JSON envelopes.
+
+import "core/bit_math.oo";
+
+fn esc() -> String {
+    return bytes_to_str(bytes_push(bytes_new(), 27));
+}
+
+pub fn ansi_reset() -> String { return esc() + "[0m"; }
+pub fn ansi_bold() -> String { return esc() + "[1m"; }
+pub fn ansi_cyan() -> String { return esc() + "[1;36m"; }
+pub fn ansi_green() -> String { return esc() + "[1;32m"; }
+pub fn ansi_yellow() -> String { return esc() + "[33m"; }
+pub fn ansi_blue() -> String { return esc() + "[1;34m"; }
+
+pub fn render_bit_view(content: String, max_bytes: Int) -> String {
+    let total: Int = chars_len(content);
+    let mut limit: Int = total;
+    if max_bytes > 0 && limit > max_bytes {
+        limit = max_bytes;
+    }
+
+    let mut out: String = ansi_cyan() + "=== Bit-Level Inspection (" + to_string(limit) + " of " + to_string(total) + " bytes) ===" + ansi_reset() + "\n";
+    let mut i: Int = 0;
+
+    while i < limit {
+        let b: Int = byte_at(content, i);
+        let hex_val: String = byte_to_hex(b);
+        let bit_val: String = byte_to_bit_str(b);
+        let ascii_char: String = if b >= 32 && b <= 126 {
+            bytes_to_str(bytes_push(bytes_new(), b))
+        } else {
+            "."
+        };
+
+        out = out + "  [" + to_string(i) + "] 0x" + hex_val + "  " + bit_val + "  |" + ascii_char + "|\n";
+        i = i + 1;
+    }
+
+    return out;
+}
+
+pub fn render_binary_stats_json(orig_size: Int, new_size: Int, op_name: String) -> String {
+    let mut out: String = "{\n";
+    out = out + "  \"operation\": \"" + op_name + "\",\n";
+    out = out + "  \"original_bytes\": " + to_string(orig_size) + ",\n";
+    out = out + "  \"transformed_bytes\": " + to_string(new_size) + ",\n";
+    out = out + "  \"status\": \"success\"\n";
+    out = out + "}\n";
+    return out;
+}
+
+pub fn render_bits_json(content: String, max_bytes: Int) -> String {
+    let total: Int = chars_len(content);
+    let mut limit: Int = total;
+    if max_bytes > 0 && limit > max_bytes {
+        limit = max_bytes;
+    }
+
+    let mut out: String = "{\n";
+    out = out + "  \"total_bytes\": " + to_string(total) + ",\n";
+    out = out + "  \"inspected_bytes\": " + to_string(limit) + ",\n";
+    out = out + "  \"bits\": \"";
+
+    let mut i: Int = 0;
+    while i < limit {
+        let b: Int = byte_at(content, i);
+        out = out + byte_to_bit_str(b);
+        if i + 1 < limit {
+            out = out + " ";
+        }
+        i = i + 1;
+    }
+
+    out = out + "\"\n}\n";
+    return out;
+}

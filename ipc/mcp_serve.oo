@@ -1,0 +1,128 @@
+// # oobinary Model Context Protocol (MCP) Stdio Server
+//
+// Logline: JSON-RPC 2.0 stdio server providing bit packing, endianness conversion, and alignment.
+//
+// Setup: Demands FsReadCap for stream reading and stdio streaming. Zero ambient authority.
+//
+// Beats:
+//   1. Ingest JSON-RPC 2.0 frames over stdin and dispatch RPC methods.
+//   2. Advertise binary tools: binary_endian, binary_mask, binary_align, binary_bits, binary_stats.
+//   3. Execute capability-bounded bit operations and stream JSON responses.
+
+import "core/endian_swap.oo";
+import "core/bit_mask.oo";
+import "render/binary_theme.oo";
+import "ipc/json_field.oo";
+import "ipc/binary_opts.oo";
+
+pub fn run_mcp_server(fs: &FsReadCap) {
+    let mut running: Bool = true;
+    while running {
+        let line_res: Result[String, String] = oo_read_stdin_chunk(fs, 8192);
+        if !line_res.is_ok() {
+            running = false;
+        } else {
+            let line: String = match line_res { Ok(s) => s, Err(_) => "" };
+            let trimmed: String = str_trim(line);
+            if chars_len(trimmed) == 0 {
+                running = false;
+            } else {
+                let id: String = json_get_field(trimmed, "id");
+                let method: String = json_get_string(trimmed, "method");
+
+                if method == "initialize" {
+                    let resp: String = "{\"jsonrpc\":\"2.0\",\"id\":" + id +
+                        ",\"result\":{\"protocolVersion\":\"2024-11-05\"," +
+                        "\"serverInfo\":{\"name\":\"oobinary\",\"version\":\"0.2.0\"}," +
+                        "\"capabilities\":{\"tools\":{}}}}";
+                    println(resp);
+                } else if method == "notifications/initialized" {
+                    // Ack
+                } else if method == "tools/list" {
+                    let t1: String = "{\"name\":\"binary_endian\",\"description\":\"Invert endianness across 16, 32, or 64-bit words\"," +
+                        "\"inputSchema\":{\"type\":\"object\",\"properties\":{\"text\":{\"type\":\"string\"},\"path\":{\"type\":\"string\"},\"width\":{\"type\":\"integer\"}},\"required\":[\"width\"]}}";
+                    let t2: String = "{\"name\":\"binary_mask\",\"description\":\"Apply bitwise AND, OR, XOR, or NOT mask\"," +
+                        "\"inputSchema\":{\"type\":\"object\",\"properties\":{\"text\":{\"type\":\"string\"},\"path\":{\"type\":\"string\"},\"mask\":{\"type\":\"integer\"},\"op\":{\"type\":\"string\"}},\"required\":[\"mask\",\"op\"]}}";
+                    let t3: String = "{\"name\":\"binary_align\",\"description\":\"Pad stream to arbitrary byte boundary\"," +
+                        "\"inputSchema\":{\"type\":\"object\",\"properties\":{\"text\":{\"type\":\"string\"},\"path\":{\"type\":\"string\"},\"align\":{\"type\":\"integer\"},\"pad\":{\"type\":\"integer\"}},\"required\":[\"align\"]}}";
+                    let t4: String = "{\"name\":\"binary_bits\",\"description\":\"Convert byte stream into 8-bit binary bit representations\"," +
+                        "\"inputSchema\":{\"type\":\"object\",\"properties\":{\"text\":{\"type\":\"string\"},\"path\":{\"type\":\"string\"},\"limit\":{\"type\":\"integer\"}}}}";
+                    let t5: String = "{\"name\":\"binary_stats\",\"description\":\"Query oobinary bit-packing engine specifications\"," +
+                        "\"inputSchema\":{\"type\":\"object\",\"properties\":{}}}";
+                    let resp: String = "{\"jsonrpc\":\"2.0\",\"id\":" + id +
+                        ",\"result\":{\"tools\":[" + t1 + "," + t2 + "," + t3 + "," + t4 + "," + t5 + "]}}";
+                    println(resp);
+                } else if method == "tools/call" {
+                    let params: String = json_get_field(trimmed, "params");
+                    let tool_name: String = json_get_string(params, "name");
+                    let args: String = json_get_field(params, "arguments");
+
+                    let raw_text: String = json_get_string(args, "text");
+                    let raw_path: String = json_get_string(args, "path");
+                    let mut payload: String = raw_text;
+                    if chars_len(payload) == 0 && chars_len(raw_path) > 0 {
+                        let f_res: Result[String, String] = read_file(fs, raw_path);
+                        if f_res.is_ok() {
+                            payload = match f_res { Ok(s) => s, Err(_) => "" };
+                        }
+                    }
+
+                    if tool_name == "binary_endian" {
+                        let w_str: String = json_get_field(args, "width");
+                        let width: Int = if chars_len(w_str) > 0 { parse_int_str(w_str) } else { 16 };
+                        let swapped: String = if width == 32 {
+                            swap_endian_32(payload)
+                        } else if width == 64 {
+                            swap_endian_64(payload)
+                        } else {
+                            swap_endian_16(payload)
+                        };
+                        let j: String = render_binary_stats_json(chars_len(payload), chars_len(swapped), "endian_swap_" + to_string(width));
+                        let resp: String = "{\"jsonrpc\":\"2.0\",\"id\":" + id +
+                            ",\"result\":{\"content\":[{\"type\":\"text\",\"text\":\"" + json_escape_string(j) + "\"}]}}";
+                        println(resp);
+                    } else if tool_name == "binary_mask" {
+                        let m_str: String = json_get_field(args, "mask");
+                        let mask: Int = if chars_len(m_str) > 0 { parse_int_str(m_str) } else { 0 };
+                        let op: String = json_get_string(args, "op");
+                        let masked: String = apply_mask_op(payload, mask, op);
+                        let j: String = render_binary_stats_json(chars_len(payload), chars_len(masked), "mask_" + op);
+                        let resp: String = "{\"jsonrpc\":\"2.0\",\"id\":" + id +
+                            ",\"result\":{\"content\":[{\"type\":\"text\",\"text\":\"" + json_escape_string(j) + "\"}]}}";
+                        println(resp);
+                    } else if tool_name == "binary_align" {
+                        let a_str: String = json_get_field(args, "align");
+                        let p_str: String = json_get_field(args, "pad");
+                        let align: Int = if chars_len(a_str) > 0 { parse_int_str(a_str) } else { 8 };
+                        let pad: Int = if chars_len(p_str) > 0 { parse_int_str(p_str) } else { 0 };
+                        let aligned: String = align_stream(payload, align, pad);
+                        let j: String = render_binary_stats_json(chars_len(payload), chars_len(aligned), "align_" + to_string(align));
+                        let resp: String = "{\"jsonrpc\":\"2.0\",\"id\":" + id +
+                            ",\"result\":{\"content\":[{\"type\":\"text\",\"text\":\"" + json_escape_string(j) + "\"}]}}";
+                        println(resp);
+                    } else if tool_name == "binary_bits" {
+                        let l_str: String = json_get_field(args, "limit");
+                        let limit: Int = if chars_len(l_str) > 0 { parse_int_str(l_str) } else { 32 };
+                        let j: String = render_bits_json(payload, limit);
+                        let resp: String = "{\"jsonrpc\":\"2.0\",\"id\":" + id +
+                            ",\"result\":{\"content\":[{\"type\":\"text\",\"text\":\"" + json_escape_string(j) + "\"}]}}";
+                        println(resp);
+                    } else if tool_name == "binary_stats" {
+                        let j: String = "{\"engine\":\"oobinary\",\"version\":\"0.2.0\",\"pure_native\":true,\"operations\":[\"swap16\",\"swap32\",\"swap64\",\"mask_and\",\"mask_or\",\"mask_xor\",\"mask_not\",\"align\",\"reverse_bits\"]}";
+                        let resp: String = "{\"jsonrpc\":\"2.0\",\"id\":" + id +
+                            ",\"result\":{\"content\":[{\"type\":\"text\",\"text\":\"" + json_escape_string(j) + "\"}]}}";
+                        println(resp);
+                    } else {
+                        let resp: String = "{\"jsonrpc\":\"2.0\",\"id\":" + id +
+                            ",\"error\":{\"code\":-32601,\"message\":\"Method not found\"}}";
+                        println(resp);
+                    }
+                } else {
+                    let resp: String = "{\"jsonrpc\":\"2.0\",\"id\":" + id +
+                        ",\"error\":{\"code\":-32601,\"message\":\"Method not found\"}}";
+                    println(resp);
+                }
+            }
+        }
+    }
+}

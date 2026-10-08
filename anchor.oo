@@ -1,13 +1,23 @@
-// # oobinary Root Anchor
+// # oobinary Root Subsystem Anchor
 //
-// Logline: Top-level anchor re-exporting options, core logic, render, and ipc subsystems.
+// Logline: Sovereign bit-level endianness converter, bitmask applicator, and stream aligner.
 //
-// Setup: Pure shim re-exporting all oobinary subsystem anchors.
+// Setup: Root barrel shim re-exporting options, core logic, render, and ipc subsystems.
 //
 // Beats:
 //   1. Re-export options parsing subsystem.
-//   2. Re-export core oobinary execution engine.
+//   2. Re-export core bit packing and alignment engine.
 //   3. Re-export render formatting subsystem.
 //   4. Re-export Model Context Protocol (MCP) IPC subsystem.
 
-import "main.oo";
+import "core/anchor.oo";
+import "render/anchor.oo";
+import "ipc/anchor.oo";
+
+pub fn oobinary_version() -> String {
+    return "0.2.0";
+}
+
+pub fn oobinary_banner() -> String {
+    return "oobinary v0.2.0 (openOODA sovereign bit packing & alignment)";
+}

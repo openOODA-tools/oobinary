@@ -1,0 +1,147 @@
+// # oobinary CLI Options Parser
+//
+// Logline: Ingests command line arguments into typed binary bit packing options.
+//
+// Setup: Pure argument decoding for endian swapping, bitmasks, alignment, and MCP server.
+//
+// Beats:
+//   1. Parse decimal and hexadecimal numbers from string sequences.
+//   2. Define BinaryOpts data structure covering all transformation modes.
+//   3. Handle flags for endianness, masks, alignments, bit viewing, and MCP stdio server.
+
+pub type BinaryOpts = struct {
+    action: String,
+    operation: String,
+    mask_val: Int,
+    mask_op: String,
+    alignment: Int,
+    pad_byte: Int,
+    bits_limit: Int,
+    json_mode: Bool,
+    input_text: String,
+    file_path: String
+};
+
+fn digit_val(c: String) -> Int {
+    if c == "0" { return 0; }
+    if c == "1" { return 1; }
+    if c == "2" { return 2; }
+    if c == "3" { return 3; }
+    if c == "4" { return 4; }
+    if c == "5" { return 5; }
+    if c == "6" { return 6; }
+    if c == "7" { return 7; }
+    if c == "8" { return 8; }
+    if c == "9" { return 9; }
+    return -1;
+}
+
+pub fn parse_int_str(s: String) -> Int {
+    let n: Int = chars_len(s);
+    let mut acc: Int = 0;
+    let mut i: Int = 0;
+    while i < n {
+        let d: Int = digit_val(char_at(s, i));
+        if d >= 0 {
+            acc = (acc * 10) + d;
+        }
+        i = i + 1;
+    }
+    return acc;
+}
+
+pub fn default_binary_opts() -> BinaryOpts {
+    return BinaryOpts {
+        action: "run",
+        operation: "bits",
+        mask_val: 0,
+        mask_op: "xor",
+        alignment: 1,
+        pad_byte: 0,
+        bits_limit: 32,
+        json_mode: false,
+        input_text: "",
+        file_path: ""
+    };
+}
+
+pub fn parse_binary_args(args: List[String]) -> BinaryOpts {
+    let mut opts: BinaryOpts = default_binary_opts();
+    let n: Int = list_len(args);
+    let mut i: Int = 0;
+
+    while i < n {
+        let arg: String = list_get(args, i);
+
+        if arg == "-h" || arg == "--help" {
+            opts.action = "help";
+            return opts;
+        } else if arg == "-v" || arg == "--version" {
+            opts.action = "version";
+            return opts;
+        } else if arg == "--mcp" {
+            opts.action = "mcp";
+            return opts;
+        } else if arg == "--swap16" {
+            opts.operation = "swap16";
+        } else if arg == "--swap32" {
+            opts.operation = "swap32";
+        } else if arg == "--swap64" {
+            opts.operation = "swap64";
+        } else if arg == "-e" || arg == "--endian" {
+            if i + 1 < n {
+                i = i + 1;
+                let w: String = list_get(args, i);
+                if w == "16" { opts.operation = "swap16"; }
+                else if w == "32" { opts.operation = "swap32"; }
+                else if w == "64" { opts.operation = "swap64"; }
+            }
+        } else if arg == "-m" || arg == "--mask" {
+            opts.operation = "mask";
+            if i + 1 < n {
+                i = i + 1;
+                opts.mask_val = parse_int_str(list_get(args, i));
+            }
+        } else if arg == "--op" {
+            if i + 1 < n {
+                i = i + 1;
+                opts.mask_op = list_get(args, i);
+            }
+        } else if arg == "-a" || arg == "--align" {
+            opts.operation = "align";
+            if i + 1 < n {
+                i = i + 1;
+                opts.alignment = parse_int_str(list_get(args, i));
+            }
+        } else if arg == "-p" || arg == "--pad" {
+            if i + 1 < n {
+                i = i + 1;
+                opts.pad_byte = parse_int_str(list_get(args, i));
+            }
+        } else if arg == "-b" || arg == "--bits" {
+            opts.operation = "bits";
+        } else if arg == "-r" || arg == "--reverse" {
+            opts.operation = "reverse";
+        } else if arg == "-n" || arg == "--length" {
+            if i + 1 < n {
+                i = i + 1;
+                opts.bits_limit = parse_int_str(list_get(args, i));
+            }
+        } else if arg == "--json" {
+            opts.json_mode = true;
+        } else if arg == "-f" || arg == "--file" {
+            if i + 1 < n {
+                i = i + 1;
+                opts.file_path = list_get(args, i);
+            }
+        } else if !str_starts_with(arg, "-") {
+            if chars_len(opts.input_text) == 0 && chars_len(opts.file_path) == 0 {
+                opts.input_text = arg;
+            }
+        }
+
+        i = i + 1;
+    }
+
+    return opts;
+}

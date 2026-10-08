@@ -54,32 +54,40 @@ oobinary-uninstall
 ## 2. CLI Usage
 
 ```
-usage: oobinary [options] [ARGUMENTS]...
+usage: oobinary [options] [INPUT_OR_FILE]
 
-Bit-level endianness converter, bitmask applicator, and stream aligner.
+Capability-bounded endianness converter, bitmask applicator, and stream aligner.
 
 Options:
-  -h, --help           display this help and exit
-  -v, --version        output version information and exit
-      --json           output formatted as JSON Lines
-      --color <WHEN>   colorize output: auto, always, never [default: auto]
-      --theme <NAME>   override active oote palette
-      --mcp            run as Model Context Protocol stdio server
+  -h, --help               display this help and exit
+  -v, --version            output version information and exit
+  -b, --bits               display 8-bit binary representation (default)
+      --swap16             invert 16-bit word byte pairs
+      --swap32             invert 32-bit word byte order
+      --swap64             invert 64-bit word byte order
+  -e, --endian <16|32|64>  invert word byte order for specified width
+  -m, --mask <VAL>         apply bitwise mask value (0-255)
+      --op <and|or|xor|not> bitwise mask operator [default: xor]
+  -a, --align <N>          pad byte stream to N-byte boundary [default: 1]
+  -p, --pad <BYTE>         fill byte value for alignment padding [default: 0]
+  -r, --reverse            reverse bit order within each byte
+  -n, --length <N>         maximum bytes to inspect in bit view [default: 32]
+  -f, --file <PATH>        read payload from file
+      --json               output telemetry as formatted JSON
+      --mcp                run as Model Context Protocol stdio server
 ```
 
 ---
 
-## 3. Theming Integration (`oote`)
-
-`oobinary` synchronizes visual styles and status colors with [oote](https://github.com/openOODA-tools/oote):
-* **Configuration:** Reads active palette from `~/.openooda/theme.oot`.
-* **Environment Overrides:** Respects `$OODA_THEME` and `$NO_COLOR`.
-
----
-
-## 4. Model Context Protocol (MCP)
+## 3. Model Context Protocol (MCP)
 
 When invoked with `--mcp`, `oobinary` runs a JSON-RPC 2.0 stdio server providing structured tools for AI coding agents:
+
+* `binary_endian`: Invert word endianness across 16-bit, 32-bit, or 64-bit word boundaries.
+* `binary_mask`: Apply bitwise AND, OR, XOR, or NOT masks across byte streams.
+* `binary_align`: Pad byte streams to arbitrary power-of-two boundaries with custom fill values.
+* `binary_bits`: Format raw bytes into structured 8-bit binary string representations.
+* `binary_stats`: Query oobinary bit-packing engine specifications and available operations.
 
 ```bash
 oobinary --mcp
@@ -87,14 +95,14 @@ oobinary --mcp
 
 ---
 
-## 5. Security & Zero Ambient Authority
+## 4. Security & Zero Ambient Authority
 
-* **Pure Capability Bounded:** Operates strictly with explicit tokens (&FsReadCap, &StreamCap, &McpCap). Physical absence of ambient disk/net leakage.
-* **Negative-Trust Architecture:** Strict input validation and operational limits.
+* **Pure Capability Bounded:** Operates strictly with explicit tokens (`&FsReadCap`, `&ProcessCap`, `&EnvCap`, `&McpCap`). Physical absence of ambient disk/net leakage.
+* **Negative-Trust Architecture:** Strict input validation and bounded word widths.
 * **Hermetic Binary:** Standalone zero-dependency executable.
 
 ---
 
-## 6. License
+## 5. License
 
 Apache License, Version 2.0. See [LICENSE](LICENSE) for details.

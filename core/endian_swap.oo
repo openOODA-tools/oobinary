@@ -1,0 +1,88 @@
+// # oobinary Endianness Swapping Engine
+//
+// Logline: Inverts byte order across 16-bit, 32-bit, and 64-bit binary word boundaries.
+//
+// Setup: Pure chunk-based word transformation converting between big and little endian.
+//
+// Beats:
+//   1. Swap 16-bit adjacent byte pairs across data streams.
+//   2. Reverse 32-bit and 64-bit integer words in chunked passes.
+//   3. Preserve trailing unaligned residual bytes without truncation.
+
+pub fn swap_endian_16(content: String) -> String {
+    let n: Int = chars_len(content);
+    let mut out: List[Int] = bytes_new();
+    let mut i: Int = 0;
+
+    while i + 1 < n {
+        let b0: Int = byte_at(content, i);
+        let b1: Int = byte_at(content, i + 1);
+        out = bytes_push(out, b1);
+        out = bytes_push(out, b0);
+        i = i + 2;
+    }
+
+    if i < n {
+        out = bytes_push(out, byte_at(content, i));
+    }
+
+    return bytes_to_str(out);
+}
+
+pub fn swap_endian_32(content: String) -> String {
+    let n: Int = chars_len(content);
+    let mut out: List[Int] = bytes_new();
+    let mut i: Int = 0;
+
+    while i + 3 < n {
+        let b0: Int = byte_at(content, i);
+        let b1: Int = byte_at(content, i + 1);
+        let b2: Int = byte_at(content, i + 2);
+        let b3: Int = byte_at(content, i + 3);
+        out = bytes_push(out, b3);
+        out = bytes_push(out, b2);
+        out = bytes_push(out, b1);
+        out = bytes_push(out, b0);
+        i = i + 4;
+    }
+
+    while i < n {
+        out = bytes_push(out, byte_at(content, i));
+        i = i + 1;
+    }
+
+    return bytes_to_str(out);
+}
+
+pub fn swap_endian_64(content: String) -> String {
+    let n: Int = chars_len(content);
+    let mut out: List[Int] = bytes_new();
+    let mut i: Int = 0;
+
+    while i + 7 < n {
+        let mut k: Int = 7;
+        while k >= 0 {
+            out = bytes_push(out, byte_at(content, i + k));
+            k = k - 1;
+        }
+        i = i + 8;
+    }
+
+    while i < n {
+        out = bytes_push(out, byte_at(content, i));
+        i = i + 1;
+    }
+
+    return bytes_to_str(out);
+}
+
+pub fn swap_endian_stream(content: String, word_size: Int) -> String {
+    if word_size == 2 {
+        return swap_endian_16(content);
+    } else if word_size == 4 {
+        return swap_endian_32(content);
+    } else if word_size == 8 {
+        return swap_endian_64(content);
+    }
+    return content;
+}

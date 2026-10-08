@@ -1,0 +1,81 @@
+// # oobinary Bitmask and Stream Alignment
+//
+// Logline: Applies bitwise masks, bit reversal, and byte-boundary padding alignment.
+//
+// Setup: Vectorized byte transforms bounded by explicit capabilities and word widths.
+//
+// Beats:
+//   1. Execute AND, OR, XOR, and NOT bitmasking against byte streams.
+//   2. Invert bit significance within each individual byte of the stream.
+//   3. Pad streams to arbitrary power-of-two byte boundaries with fill patterns.
+
+import "core/bit_math.oo";
+
+pub fn apply_mask_op(content: String, mask: Int, op: String) -> String {
+    let n: Int = chars_len(content);
+    let mut out: List[Int] = bytes_new();
+    let m: Int = mask & 255;
+    let mut i: Int = 0;
+
+    while i < n {
+        let b: Int = byte_at(content, i);
+        let mut res: Int = b;
+        if op == "and" {
+            res = b & m;
+        } else if op == "or" {
+            res = b | m;
+        } else if op == "xor" {
+            res = b ^ m;
+        } else if op == "not" {
+            res = (b ^ 255) & 255;
+        }
+        out = bytes_push(out, res);
+        i = i + 1;
+    }
+
+    return bytes_to_str(out);
+}
+
+pub fn reverse_bits_stream(content: String) -> String {
+    let n: Int = chars_len(content);
+    let mut out: List[Int] = bytes_new();
+    let mut i: Int = 0;
+
+    while i < n {
+        let b: Int = byte_at(content, i);
+        out = bytes_push(out, reverse_bits8(b));
+        i = i + 1;
+    }
+
+    return bytes_to_str(out);
+}
+
+pub fn align_stream(content: String, alignment: Int, pad_byte: Int) -> String {
+    if alignment <= 1 {
+        return content;
+    }
+
+    let n: Int = chars_len(content);
+    let rem: Int = n % alignment;
+    if rem == 0 {
+        return content;
+    }
+
+    let needed: Int = alignment - rem;
+    let mut out: List[Int] = bytes_new();
+    let mut i: Int = 0;
+
+    while i < n {
+        out = bytes_push(out, byte_at(content, i));
+        i = i + 1;
+    }
+
+    let p: Int = pad_byte & 255;
+    let mut k: Int = 0;
+    while k < needed {
+        out = bytes_push(out, p);
+        k = k + 1;
+    }
+
+    return bytes_to_str(out);
+}

@@ -1,0 +1,10 @@
+Package: oobinary
+Version: 0.2.0-1
+Section: utils
+Priority: optional
+Architecture: amd64
+Maintainer: openOODA-tools <ops@openooda.org>
+Description: Sovereign Bit Packer and Stream Aligner
+ Bit-level endianness converter, bitmask applicator, and stream aligner.
+ 100% pure native openOODA (.oo) utility with zero ambient authority,
+ dual POSIX CLI and streaming JSON-RPC 2.0 Model Context Protocol (MCP) server.
